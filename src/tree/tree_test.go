@@ -97,7 +97,7 @@ func TestNode_IsInside(t *testing.T) {
 	}
 }
 
-func TestTree_Hash(t *testing.T) {
+func TestTree_Path(t *testing.T) {
 	tree := NewTree(
 		&Point{},
 		&Point{
@@ -139,7 +139,7 @@ func TestTree_Hash(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		node, actual := tree.Hash(tc.point, tc.depth)
+		node, actual := tree.Path(tc.point, tc.depth)
 		if !node.IsInside(tc.point) {
 			t.Errorf("invalid position: %v", node)
 		}

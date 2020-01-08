@@ -24,7 +24,7 @@ CREATE TABLE Points (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   x REAL NOT NULL,
   y REAL NOT NULL,
-  hash TEXT NOT NULL
+  path TEXT NOT NULL
 );`
 		_, err = db.Exec(createTable)
 		if err != nil {
@@ -32,7 +32,7 @@ CREATE TABLE Points (
 		}
 
 		createIndex := `
-CREATE INDEX indexHash ON Points(hash);`
+CREATE INDEX indexHash ON Points(path);`
 		_, err = db.Exec(createIndex)
 		if err != nil {
 			panic(err)
@@ -81,8 +81,8 @@ func insertTestData(db *sql.DB) *qtree.Tree {
 					X: i + prime,
 					Y: j + prime,
 				}
-				_, h := tree.Hash(p, 10)
-				_, err := db.Exec("INSERT INTO Points (x, y, hash) VALUES(?,?,?)", i, j, h)
+				_, h := tree.Path(p, 10)
+				_, err := db.Exec("INSERT INTO Points (x, y, path) VALUES(?,?,?)", i, j, h)
 				if err != nil {
 					panic(err)
 				}
@@ -147,9 +147,9 @@ func BenchmarkTree(b *testing.B) {
 		X: 0.3,
 		Y: 0.4,
 	}
-	_, h := tree.Hash(p, 5) // &{0 0} &{0.625 0.625} 30000
+	_, h := tree.Path(p, 5) // &{0 0} &{0.625 0.625} 30000
 	b.ResetTimer()
-	rows, err := db.Query("SELECT x, y FROM Points WHERE ? <= hash AND hash <= ?", h, h+"~")
+	rows, err := db.Query("SELECT x, y FROM Points WHERE ? <= path AND path <= ?", h, h+"~")
 	if err != nil {
 		panic(err)
 	}

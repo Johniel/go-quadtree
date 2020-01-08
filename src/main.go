@@ -36,7 +36,7 @@ CREATE TABLE Points (
 		return err
 	}
 
-	createIndex := `CREATE INDEX indexHash ON Points(path);`
+	createIndex := `CREATE INDEX indexPath ON Points(path);`
 	_, err = db.Exec(createIndex)
 	if err != nil {
 		return err
@@ -53,14 +53,14 @@ func (r *repository) finalize() error {
 }
 
 func (r *repository) insert(p *qtree.Point) error {
-	_, h := r.tree.Hash(p, 10)
+	_, h := r.tree.Path(p, 10)
 	// 座標と共に経路もINSERTする
 	_, err := r.db.Exec("INSERT INTO Points (x, y, path) VALUES(?,?,?)", p.X, p.Y, h)
 	return err
 }
 
 func (r *repository) search(p *qtree.Point, depth int32) ([]*qtree.Point, error) {
-	_, path := r.tree.Hash(p, depth)
+	_, path := r.tree.Path(p, depth)
 	// 内包する深さdepthの領域の子孫に位置する点をSELECTする
 	rows, err := r.db.Query("SELECT x, y FROM Points WHERE ? <= path AND path <= ?", path, path+"~")
 	if err != nil {
@@ -89,7 +89,7 @@ func (r *repository) search(p *qtree.Point, depth int32) ([]*qtree.Point, error)
 }
 
 func (r *repository) circleSearch(center *qtree.Point, radius float64) ([]*qtree.Point, error) {
-	root, _ := r.tree.Hash(center, 0)
+	root, _ := r.tree.Path(center, 0)
 
 	depth := int32(0)
 	// 求めたい距離超えない最小の幅になるように深さを決める
@@ -97,7 +97,7 @@ func (r *repository) circleSearch(center *qtree.Point, radius float64) ([]*qtree
 	}
 	depth--
 	// 中心点はこの頂点の持つ領域にある。
-	centerNode, _ := r.tree.Hash(center, depth)
+	centerNode, _ := r.tree.Path(center, depth)
 	candidates, err := r.search(center, depth)
 	if err != nil {
 		return nil, err
@@ -194,7 +194,7 @@ func main() {
 	fmt.Println("")
 
 	// pを内包する深さ5の領域と8近傍の子孫に含まれる点をSELECTする
-	node, _ := demo.tree.Hash(p, 5)
+	node, _ := demo.tree.Path(p, 5)
 	for _, a := range node.Adjacent() {
 		ps, err := demo.search(a.Mid(), node.Depth)
 		if err != nil {
@@ -216,7 +216,7 @@ func main() {
 		X: 20.0,
 		Y: 30.0,
 	}
-	curr, _ := demo.tree.Hash(begin, 5)
+	curr, _ := demo.tree.Path(begin, 5)
 	for curr.Min.X <= end.X && curr.Min.Y <= end.Y {
 		ps, err := demo.search(curr.Mid(), 5)
 		if err != nil {
