@@ -102,7 +102,7 @@ func NewTree(min *Point, max *Point) *Tree {
 	}
 }
 
-func (t *Tree) Hash(p *Point, depth int32) (*Node, string) {
+func (t *Tree) Path(p *Point, depth int32) (*Node, string) {
 	node := &Node{
 		Min: t.min,
 		Max: t.max,
