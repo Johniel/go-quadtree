@@ -1,5 +1,9 @@
 package tree
 
+import (
+	"strings"
+)
+
 // 座標
 type Point struct {
 	X float64
@@ -66,11 +70,11 @@ func (n *Node) Adjacent() []*Node {
 	adjacent := make([]*Node, len(dirX))
 	for d := 0; d < len(dirX); d++ {
 		m := &Node{
-			Min:   &Point{
+			Min: &Point{
 				X: n.Min.X,
 				Y: n.Min.Y,
 			},
-			Max:   &Point{
+			Max: &Point{
 				X: n.Max.X,
 				Y: n.Max.Y,
 			},
@@ -104,16 +108,16 @@ func (t *Tree) Hash(p *Point, depth int32) (*Node, string) {
 		Max: t.max,
 	}
 
-	var path string
+	builder := &strings.Builder{}
 	label := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz{|}"
 	for node.Depth < depth {
 		for idx, ch := range node.Children() {
 			if ch.IsInside(p) {
 				node = ch
-				path += string(label[idx])
+				builder.WriteByte(label[idx])
 				break
 			}
 		}
 	}
-	return node, path
+	return node, builder.String()
 }
