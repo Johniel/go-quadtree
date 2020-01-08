@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"math"
 	"os"
 
 	qtree "github.com/Johniel/go-quadtree/src/tree"
@@ -16,7 +17,7 @@ type repository struct {
 	depth int32       // 木の深さの上限
 }
 
-func (d *repository) init(minPoint, maxPoint *qtree.Point, depth int32) error {
+func (r *repository) init(minPoint, maxPoint *qtree.Point, depth int32) error {
 	os.Remove("./demo.db")
 	db, err := sql.Open("sqlite3", "./demo.db")
 	if err != nil {
@@ -41,27 +42,27 @@ CREATE TABLE Points (
 		return err
 	}
 
-	d.db = db
-	d.tree = qtree.NewTree(minPoint, maxPoint)
-	d.depth = depth
+	r.db = db
+	r.tree = qtree.NewTree(minPoint, maxPoint)
+	r.depth = depth
 	return nil
 }
 
-func (d *repository) finalize() error {
-	return d.db.Close()
+func (r *repository) finalize() error {
+	return r.db.Close()
 }
 
-func (d *repository) insert(p *qtree.Point) error {
-	_, h := d.tree.Hash(p, 10)
+func (r *repository) insert(p *qtree.Point) error {
+	_, h := r.tree.Hash(p, 10)
 	// 座標と共に経路もINSERTする
-	_, err := d.db.Exec("INSERT INTO Points (x, y, path) VALUES(?,?,?)", p.X, p.Y, h)
+	_, err := r.db.Exec("INSERT INTO Points (x, y, path) VALUES(?,?,?)", p.X, p.Y, h)
 	return err
 }
 
-func (d *repository) search(p *qtree.Point, depth int32) ([]*qtree.Point, error) {
-	_, path := d.tree.Hash(p, depth)
+func (r *repository) search(p *qtree.Point, depth int32) ([]*qtree.Point, error) {
+	_, path := r.tree.Hash(p, depth)
 	// 内包する深さdepthの領域の子孫に位置する点をSELECTする
-	rows, err := d.db.Query("SELECT x, y FROM Points WHERE ? <= path AND path <= ?", path, path+"~")
+	rows, err := r.db.Query("SELECT x, y FROM Points WHERE ? <= path AND path <= ?", path, path+"~")
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +88,39 @@ func (d *repository) search(p *qtree.Point, depth int32) ([]*qtree.Point, error)
 	return ps, nil
 }
 
+func (r *repository) circleSearch(center *qtree.Point, radius float64) ([]*qtree.Point, error) {
+	root, _ := r.tree.Hash(center, 0)
+
+	depth := int32(0)
+	// 求めたい距離超えない最小の幅になるように深さを決める
+	for ; radius < (root.Max.X-root.Min.X)/math.Pow(2.0, float64(depth)); depth++ {
+	}
+	depth--
+	// 中心点はこの頂点の持つ領域にある。
+	centerNode, _ := r.tree.Hash(center, depth)
+	candidates, err := r.search(center, depth)
+	if err != nil {
+		return nil, err
+	}
+	// 近傍にはみ出る場合があるので周辺も調べる.
+	// 本当は3つで済むが簡単のために対象は全ての近傍とする.
+	for _, adj := range centerNode.Adjacent() {
+		matched, err := r.search(adj.Mid(), depth)
+		if err != nil {
+			return nil, err
+		}
+		candidates = append(candidates, matched...)
+	}
+	matched := []*qtree.Point{}
+	for _, c := range candidates {
+		// 三平方の定理から本当に円の中にあるか調べる
+		if (c.X-center.X)*(c.X-center.X)+(c.Y-center.Y)*(c.Y-center.Y) <= radius*radius {
+			matched = append(matched, c)
+		}
+	}
+	return matched, nil
+}
+
 func main() {
 	dataset, err := os.Create("./dataset.tsv")
 	if err != nil {
@@ -101,6 +135,13 @@ func main() {
 		return
 	}
 	defer liner.Close()
+
+	circle, err := os.Create("./circle.tsv")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer circle.Close()
 
 	// 扱いたい領域の端2点
 	minPoint := &qtree.Point{
@@ -187,5 +228,17 @@ func main() {
 			liner.Write(([]byte)(fmt.Sprintf("%f\t%f\n", q.X, q.Y)))
 		}
 		curr = curr.Adjacent()[7]
+	}
+
+	// 円形(簡単のために9領域を取得してフィルタする)
+	center := &qtree.Point{
+		X: 20.0,
+		Y: 20.0,
+	}
+	radius := 5.0
+	ps, _ = demo.circleSearch(center, radius)
+	for _, p := range ps {
+		// プロットしたいから出力
+		circle.Write(([]byte)(fmt.Sprintf("%f\t%f\n", p.X, p.Y)))
 	}
 }
